@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nadine's Logic of Love</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #120421;
+            --bg-panel: #1f0b2e;
+            --primary: #ff2a6d; /* Pink Neon */
+            --secondary: #05d9e8; /* Cyan Neon */
+            --text: #d1f7ff;
+            --grid-line: #462557;
+            --correct: #00ff9d;
+            --wrong: #ff0055;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            font-family: 'Press Start 2P', monospace;
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --- CRT EFFECT --- */
+        .crt-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 450px;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* --- SCREENS --- */
+        .screen {
+            display: none;
+            width: 100%;
+            flex-direction: column;
+            align-items: center;
+            animation: fadeIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        
+        .screen.active { display: flex; }
+
+        /* --- IMAGES --- */
+        .frame-photo {
+            width: 140px;
+            height: 140px;
+            object-fit: cover;
+            border: 4px solid var(--primary);
+            box-shadow: 6px 6px 0px var(--secondary);
+            margin-bottom: 25px;
+            background: #000;
+        }
+
+        h1 {
+            font-size: 1.1rem;
+            color: var(--secondary);
+            text-shadow: 2px 2px 0px var(--primary);
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        /* --- SUDOKU GRID --- */
+        .sudoku-board {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 1px;
+            background: var(--primary);
+            border: 4px solid var(--secondary);
+            width: 100%;
+            aspect-ratio: 1;
+            margin-bottom: 20px;
+            box-shadow: 0 0 20px rgba(5, 217, 232, 0.3);
+        }
+
+        .cell {
+            background: var(--bg-panel);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1rem;
+            color: #fff;
+            cursor: pointer;
+            position: relative;
+        }
+
+        /* Thicker borders for 3x3 zones */
+        .cell:nth-child(3n) { border-right: 2px solid var(--secondary); }
+        .cell:nth-child(9n) { border-right: none; }
+        .cell:nth-child(n+19):nth-child(-n+27),
+        .cell:nth-child(n+46):nth-child(-n+54) {
+            border-bottom: 2px solid var(--secondary);
+        }
+
+        .cell.fixed { color: var(--secondary); cursor: default; }
+        .cell.selected { background: rgba(255, 42, 109, 0.4); }
+        .cell.wrong { color: var(--wrong); animation: shake 0.3s; }
+        .cell.filled { color: var(--primary); }
+
+        /* --- NUMPAD --- */
+        .numpad {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            width: 100%;
+        }
+
+        .num-btn {
+            background: var(--bg-panel);
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            padding: 12px 0;
+            font-family: inherit;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.1s;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.5);
+        }
+
+        .num-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        .btn-main {
+            background: var(--secondary);
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-family: inherit;
+            font-size: 1rem;
+            cursor: pointer;
+            box-shadow: 4px 4px 0 var(--primary);
+            margin-top: 10px;
+        }
+        .btn-main:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--primary); }
+
+        /* --- WIN SCREEN TEXT --- */
+        .letter-box {
+            background: rgba(0,0,0,0.6);
+            border: 2px dashed var(--secondary);
+            padding: 15px;
+            width: 100%;
+            height: 200px;
+            overflow-y: auto;
+            text-align: left;
+            font-size: 0.7rem;
+            line-height: 1.8;
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+        }
+
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } 100% { transform: translateX(0); } }
+
+        /* Responsive */
+        @media (max-width: 380px) {
+            .cell { font-size: 0.8rem; }
+            h1 { font-size: 0.9rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="crt-overlay"></div>
+
+    <div class="container">
+        
+        <div id="screen-start" class="screen active">
+            <img src="https://img.sanishtech.com/u/5bc98aecd6948df74456f86c9a7cb923.png" class="frame-photo" alt="Nadine">
+            <h1>NADINE'S<br>SUDOKU</h1>
+            <p style="font-size: 0.7rem; color: #aaa; margin-bottom: 30px; max-width: 300px;">
+                Nadine s snya sudoku.
+            </p>
+            <button class="btn-main" onclick="startGame()">START GAME</button>
+        </div>
+
+        <div id="screen-game" class="screen">
+            <div style="display:flex; justify-content:space-between; width:100%; margin-bottom:10px; font-size:0.7rem;">
+                <span style="color:var(--secondary)">LVL: <span id="difficulty">EASY</span></span>
+                <span id="mistakes" style="color:var(--primary)">ERR: 0</span>
+            </div>
+
+            <div class="sudoku-board" id="board"></div>
+
+            <div class="numpad">
+                <button class="num-btn" onclick="inputNumber(1)">1</button>
+                <button class="num-btn" onclick="inputNumber(2)">2</button>
+                <button class="num-btn" onclick="inputNumber(3)">3</button>
+                <button class="num-btn" onclick="inputNumber(4)">4</button>
+                <button class="num-btn" onclick="inputNumber(5)">5</button>
+                <button class="num-btn" onclick="inputNumber(6)">6</button>
+                <button class="num-btn" onclick="inputNumber(7)">7</button>
+                <button class="num-btn" onclick="inputNumber(8)">8</button>
+                <button class="num-btn" onclick="inputNumber(9)">9</button>
+                <button class="num-btn" onclick="inputNumber('C')" style="color:var(--wrong)">X</button>
+            </div>
+            
+            <p style="font-size:0.6rem; margin-top:15px; color:#666;">TAP KOTAK LALU TAP ANGKA</p>
+        </div>
+
+        <div id="screen-win" class="screen">
+            <h1 style="color: var(--correct);">PUZZLE SOLVED!</h1>
+            <img src="https://img.sanishtech.com/u/b6f85101afe03d3b57e821e9a7f13212.png" class="frame-photo" style="border-color: var(--correct); box-shadow: 6px 6px 0 #fff;">
+            
+            <div class="letter-box" id="long-text"></div>
+
+            <button class="btn-main" onclick="location.reload()">REPLAY</button>
+        </div>
+    </div>
+
+    <script>
+        // --- KONFIGURASI ISI HATI ---
+        // Ganti tulisan di dalam tanda kutip miring ` ` di bawah ini.
+        const longTextContent = `HAII SAYANGGG
+
+WIHH MAIN SUDOKU LAGII YAAKK HEHEHEEEE.. yaa game ini terinspirasi dari kamu kemarinn siiii jadinyaa aku recreate disinii lagii wkwkwkwkwkwk.. yaahhh ke skip yak game yang kemarinnn, tapi yasudahlahhh gapapaaa.. kita move on ke game yang sekarangg yaapss.. semogaa game kali inii ga bikin tambah stress kamuu
+
+Timakasii yaa buat harii iniii, yaa walaupun hari ini ak brengsekk tapii alhamdulillah kamu happyy dehh hari inii, timakasii tadii pagii udaa nemeninn ak buat jajann di koperasi bersama samaaa.. teruss timakasii jugaa yaapss sudaa berangkatt bareng lagii jugaakkk wkwkwkwk..teruss apalagi yaaps hehee bingungg, yasudaa intinyaa timakasii bangett buat harii inii sudaa jadii nadinee yang ceriaaa.
+
+Maaf yaa kalau hari ini dan setiap harinya ak berengsek,kontol,tai, dll. mintaa maaf yak kalau hari ini merusak mutmuuu, yaa pokoonyaa mintaa maaf dehh, gausaa di bajass lagiii.. dann terakhirr aku mau minta maaf yaa ji kalau aku setiap harinyaa nangisss hehehe.. 
+
+Okeyydee kamu juga lagi tidurr kann, maaf yaa kalau bangunin kamu tapi kamu ga bangunn.. aku udah tumbank ini nadinee, pusink,kedinginan teruss, sjjswjjwwjjw.. yasudahlahh balasan setimpal yang ku dapatkann atas semua perlakuanku ke kamuu.. okeydee selamat beristirahatt yaaa.. semogaa besok labcarr yaaa last day upraknyaaa.. besok berarti akan ku bhatin longteks about uprakk dehh heheheee.. yasudaaa paipai paipaii nadineeee goodnightt yaa sayabggg.. je t'aimeeeee bieennn mon amourrr🩵💙🩵💙🩵💙🩵💙🩵💙🩵💙🩵💙🩵💙🩵`;
+
+        // --- GAME DATA (Fixed Solvable Board for Stability) ---
+        // 0 means empty
+        const solution = [
+            5, 3, 4, 6, 7, 8, 9, 1, 2,
+            6, 7, 2, 1, 9, 5, 3, 4, 8,
+            1, 9, 8, 3, 4, 2, 5, 6, 7,
+            8, 5, 9, 7, 6, 1, 4, 2, 3,
+            4, 2, 6, 8, 5, 3, 7, 9, 1,
+            7, 1, 3, 9, 2, 4, 8, 5, 6,
+            9, 6, 1, 5, 3, 7, 2, 8, 4,
+            2, 8, 7, 4, 1, 9, 6, 3, 5,
+            3, 4, 5, 2, 8, 6, 1, 7, 9
+        ];
+
+        // Masking pattern to create the puzzle (Easy-Medium)
+        // Adjust nulls to make it harder or easier. Currently fairly easy.
+        let puzzle = [
+            5, 3, null, 6, 7, 8, 9, null, 2,
+            6, 7, 2, 1, 9, 5, 3, 4, 8,
+            1, 9, 8, 3, 4, 2, 5, 6, null,
+            8, 5, 9, 7, 6, 1, 4, 2, 3,
+            4, 2, 6, 8, 5, 3, 7, 9, 1,
+            7, 1, 3, 9, 2, 4, 8, 5, 6,
+            9, 6, 1, 5, 3, 7, 2, 8, 4,
+            2, 8, 7, 4, 1, 9, 6, 3, 5,
+            3, 4, 5, 2, 8, 6, 1, 7, 9
+        ];
+        
+        // Let's create a function to generate a simpler puzzle dynamically based on solution
+        // Hapus sekitar 20-30 angka saja biar Nadine ga pusing
+        function generatePuzzle() {
+            puzzle = [...solution]; // Copy solution
+            let attempts = 30; // Jumlah lubang (semakin tinggi semakin susah)
+            while(attempts > 0) {
+                let idx = Math.floor(Math.random() * 81);
+                if(puzzle[idx] !== null) {
+                    puzzle[idx] = null;
+                    attempts--;
+                }
+            }
+        }
+
+        // --- STATE ---
+        let selectedIndex = -1;
+        let mistakes = 0;
+        let filledCount = 0;
+        let audioCtx = null;
+
+        // --- AUDIO ENGINE ---
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'tap') { // Select cell
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'correct') { // Fill correct
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, now); // A5
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'wrong') { // Fill wrong
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'win') { // Win Melody
+                osc.type = 'triangle';
+                const melody = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+                melody.forEach((note, i) => {
+                    const o = audioCtx.createOscillator();
+                    const g = audioCtx.createGain();
+                    o.type = 'triangle';
+                    o.connect(g);
+                    g.connect(audioCtx.destination);
+                    o.frequency.value = note;
+                    g.gain.setValueAtTime(0.1, now + i*0.15);
+                    g.gain.exponentialRampToValueAtTime(0.01, now + i*0.15 + 0.3);
+                    o.start(now + i*0.15);
+                    o.stop(now + i*0.15 + 0.3);
+                });
+            }
+        }
+
+        // --- LOGIC ---
+        function startGame() {
+            initAudio();
+            generatePuzzle();
+            document.getElementById('screen-start').classList.remove('active');
+            document.getElementById('screen-game').classList.add('active');
+            renderBoard();
+        }
+
+        function renderBoard() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            filledCount = 0;
+
+            puzzle.forEach((val, i) => {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.id = `cell-${i}`;
+                
+                if (val !== null) {
+                    cell.textContent = val;
+                    cell.classList.add('fixed');
+                    filledCount++;
+                } else {
+                    cell.onclick = () => selectCell(i);
+                }
+                
+                board.appendChild(cell);
+            });
+        }
+
+        function selectCell(index) {
+            playSound('tap');
+            // Remove prev selection
+            if (selectedIndex !== -1) {
+                document.getElementById(`cell-${selectedIndex}`).classList.remove('selected');
+            }
+            selectedIndex = index;
+            document.getElementById(`cell-${index}`).classList.add('selected');
+        }
+
+        function inputNumber(num) {
+            if (selectedIndex === -1) return;
+            
+            const cell = document.getElementById(`cell-${selectedIndex}`);
+            
+            // Clear functionality
+            if (num === 'C') {
+                cell.textContent = '';
+                cell.classList.remove('filled', 'wrong');
+                puzzle[selectedIndex] = null;
+                return;
+            }
+
+            // Check Logic
+            if (num === solution[selectedIndex]) {
+                // Correct
+                cell.textContent = num;
+                cell.classList.remove('wrong');
+                cell.classList.add('filled');
+                puzzle[selectedIndex] = num;
+                playSound('correct');
+                
+                // Deselect
+                cell.classList.remove('selected');
+                selectedIndex = -1;
+
+                checkWin();
+            } else {
+                // Wrong
+                cell.textContent = num;
+                cell.classList.add('wrong');
+                mistakes++;
+                document.getElementById('mistakes').textContent = `ERR: ${mistakes}`;
+                playSound('wrong');
+            }
+        }
+
+        function checkWin() {
+            // Count current filled cells
+            let currentFilled = 0;
+            puzzle.forEach((v, i) => {
+                if (v === solution[i]) currentFilled++;
+            });
+
+            if (currentFilled === 81) {
+                setTimeout(triggerWin, 500);
+            }
+        }
+
+        function triggerWin() {
+            playSound('win');
+            document.getElementById('screen-game').classList.remove('active');
+            document.getElementById('screen-win').classList.add('active');
+            typeWriterEffect();
+        }
+
+        function typeWriterEffect() {
+            const el = document.getElementById('long-text');
+            el.textContent = '';
+            let i = 0;
+            const speed = 40;
+            
+            function type() {
+                if (i < longTextContent.length) {
+                    el.textContent += longTextContent.charAt(i);
+                    i++;
+                    el.scrollTop = el.scrollHeight;
+                    setTimeout(type, speed);
+                }
+            }
+            type();
+        }
+    </script>
+</body>
+</html>
